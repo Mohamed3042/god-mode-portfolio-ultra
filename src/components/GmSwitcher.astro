@@ -1,0 +1,147 @@
+---
+import { THEME_ORDER, THEMES, type ThemeId } from '../lib/themes';
+import { BLURBS } from '../lib/blurbs';
+import { withBase } from '../lib/base';
+
+interface Props { active: ThemeId; }
+const { active } = Astro.props;
+const activeMeta = THEMES[active];
+---
+<!-- persistent top bar -->
+<nav class="gm-topbar" aria-label="God Mode navigation">
+  <a class="gm-brand" href={withBase('/')}>
+    <span class="gm-brand-dot" aria-hidden="true"></span>
+    <span class="gm-brand-txt">GOD&nbsp;MODE</span>
+    <span class="gm-brand-cur">{activeMeta.label.replace(/^[^A-Za-z]+/, '')}</span>
+  </a>
+
+  <div class="gm-pills" role="tablist" aria-label="Switch identity">
+    {THEME_ORDER.map((id) => {
+      const t = THEMES[id];
+      return (
+        <a class="gm-pill" href={withBase(t.route)} data-theme-target={id}
+           aria-current={id === active ? 'page' : undefined}
+           style={`--pc:${t.accent}`}>{t.label}</a>
+      );
+    })}
+  </div>
+
+  <div class="gm-topbar-actions">
+    <button class="gm-icon-btn" id="gm-sound-btn" type="button" aria-pressed="false" aria-label="Toggle sound" title="Sound (off)">
+      <span class="gm-sound-on" hidden>♪</span><span class="gm-sound-off">⊘</span>
+    </button>
+    <button class="gm-worlds-btn" id="gm-worlds-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="gm-picker">
+      <span aria-hidden="true">◈</span> Worlds
+    </button>
+  </div>
+</nav>
+
+<!-- full-screen identity picker (works on touch + mouse) -->
+<div id="gm-picker" class="gm-picker" role="dialog" aria-modal="true" aria-label="Choose an identity" hidden>
+  <div class="gm-picker-backdrop" data-close></div>
+  <div class="gm-picker-panel" role="document">
+    <div class="gm-picker-head">
+      <div>
+        <div class="gm-picker-kicker">GOD MODE</div>
+        <h2 class="gm-picker-title">Choose an identity</h2>
+      </div>
+      <button class="gm-icon-btn gm-picker-close" type="button" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="gm-picker-grid">
+      {THEME_ORDER.map((id) => {
+        const t = THEMES[id];
+        return (
+          <a class="gm-pick" href={withBase(t.route)} data-theme-target={id}
+             aria-current={id === active ? 'page' : undefined}
+             style={`--pc:${t.accent};--pc2:${t.accent2}`}>
+            <span class="gm-pick-badge" aria-hidden="true"></span>
+            <span class="gm-pick-name">{t.label.replace(/^[^A-Za-z]+/, '')}</span>
+            <span class="gm-pick-frame">{t.copy.banner}</span>
+            <span class="gm-pick-blurb">{BLURBS[id]}</span>
+            <span class="gm-pick-go">Enter →</span>
+          </a>
+        );
+      })}
+    </div>
+    <div class="gm-picker-hint">Tip: press <kbd>G</kbd> to open · <kbd>←</kbd> <kbd>→</kbd> to switch · swipe on mobile</div>
+  </div>
+</div>
+
+<script>
+  import { withBase } from '../lib/base';
+
+  const picker = document.getElementById('gm-picker');
+  const openBtn = document.getElementById('gm-worlds-btn');
+  const soundBtn = document.getElementById('gm-sound-btn');
+  const order = Array.from(document.querySelectorAll<HTMLAnchorElement>('.gm-pick'));
+  const routes = order.map((a) => a.getAttribute('href') || withBase('/'));
+  const curIndex = Math.max(0, order.findIndex((a) => a.getAttribute('aria-current') === 'page'));
+
+  // ---- picker open/close ----
+  let lastFocus: HTMLElement | null = null;
+  function openPicker() {
+    if (!picker) return;
+    lastFocus = document.activeElement as HTMLElement;
+    picker.hidden = false;
+    requestAnimationFrame(() => picker.classList.add('open'));
+    openBtn?.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+    (picker.querySelector('.gm-pick[aria-current], .gm-pick') as HTMLElement)?.focus();
+  }
+  function closePicker() {
+    if (!picker) return;
+    picker.classList.remove('open');
+    openBtn?.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    setTimeout(() => { picker.hidden = true; }, 320);
+    lastFocus?.focus();
+  }
+  openBtn?.addEventListener('click', openPicker);
+  picker?.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', closePicker));
+
+  // ---- keyboard: G opens, Esc closes, arrows switch theme ----
+  addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.key === 'Escape' && picker && !picker.hidden) { closePicker(); return; }
+    if ((e.key === 'g' || e.key === 'G') && (picker?.hidden ?? true)) { e.preventDefault(); openPicker(); return; }
+    if (e.key === 'ArrowRight') gotoRel(1);
+    if (e.key === 'ArrowLeft') gotoRel(-1);
+  });
+  function gotoRel(dir: number) {
+    if (!routes.length) return;
+    const next = (curIndex + dir + routes.length) % routes.length;
+    const sw = (window as any).__gmSwitchTo;
+    if (routes[next]) { sw ? sw(routes[next]) : (location.href = routes[next]); }
+  }
+
+  // ---- swipe to switch (touch) ----
+  let sx = 0, sy = 0, tracking = false;
+  addEventListener('touchstart', (e) => {
+    if (picker && !picker.hidden) return;
+    const t = e.touches[0]; sx = t.clientX; sy = t.clientY; tracking = true;
+  }, { passive: true });
+  addEventListener('touchend', (e) => {
+    if (!tracking) return; tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 90 && Math.abs(dx) > Math.abs(dy) * 1.8) gotoRel(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  // ---- sound toggle (default muted) ----
+  function syncSound() {
+    const muted = localStorage.getItem('gm-muted') !== '0'; // default muted
+    const on = soundBtn?.querySelector('.gm-sound-on') as HTMLElement;
+    const off = soundBtn?.querySelector('.gm-sound-off') as HTMLElement;
+    if (on) on.hidden = muted; if (off) off.hidden = !muted;
+    soundBtn?.setAttribute('aria-pressed', String(!muted));
+    soundBtn?.setAttribute('title', muted ? 'Sound (off)' : 'Sound (on)');
+  }
+  soundBtn?.addEventListener('click', () => {
+    const muted = localStorage.getItem('gm-muted') !== '0';
+    localStorage.setItem('gm-muted', muted ? '0' : '1');
+    syncSound();
+    if (muted) (window as any).__gmSfx?.('toggle'); // play a click when turning on
+  });
+  syncSound();
+</script>

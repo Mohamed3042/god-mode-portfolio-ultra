@@ -1,0 +1,27 @@
+---
+import { profile } from '../data/profile';
+import { firstPublicAsset, PORTRAIT_CANDIDATES } from '../lib/assets';
+import { withBase } from '../lib/base';
+const { about, identity } = profile;
+// drop-in: add public/assets/portrait.{webp,jpg,png} and it appears here automatically
+const portrait = firstPublicAsset(PORTRAIT_CANDIDATES);
+---
+<section class="gm-about" aria-label="About & honesty">
+  {portrait && (
+    <img class="gm-portrait rv" src={withBase(portrait)} width="160" height="160"
+         alt={`${identity.name}, ${identity.roleShort}`} loading="lazy" decoding="async" />
+  )}
+  <div class="honesty rv">
+    <strong>How I actually build.</strong> {about.honesty}
+  </div>
+  <p class="bio rv">{about.bio}</p>
+  <p class="gm-note rv">{about.truth}</p>
+</section>
+
+<style>
+  .gm-portrait {
+    width: clamp(120px, 22vw, 168px); height: clamp(120px, 22vw, 168px);
+    border-radius: 20px; object-fit: cover; border: 1px solid var(--edge);
+    box-shadow: var(--shadow); margin-bottom: 6px;
+  }
+</style>

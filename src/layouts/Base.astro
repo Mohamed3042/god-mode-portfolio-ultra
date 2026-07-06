@@ -1,0 +1,215 @@
+---
+import '../styles/global.css';
+import GmSwitcher from '../components/GmSwitcher.astro';
+import { THEMES, type ThemeId } from '../lib/themes';
+import { withBase } from '../lib/base';
+import { profile } from '../data/profile';
+
+interface Props {
+  theme: ThemeId;
+  title: string;
+  description?: string;
+}
+const { theme, title, description } = Astro.props;
+const meta = THEMES[theme];
+const desc =
+  description ??
+  `${profile.identity.name} — ${profile.identity.tagline} ${profile.heroLine}. One portfolio, seven brand-styled worlds.`;
+
+// Hub previews all identities in their own fonts → load the display faces too (non-blocking).
+const HUB_PREVIEW_FONTS =
+  'https://fonts.googleapis.com/css2?family=Anton&family=Chakra+Petch:wght@700&family=Cinzel:wght@800&family=Montserrat:wght@800&family=Saira+Stencil+One&family=Sora:wght@700;800&display=swap';
+---
+<!doctype html>
+<html lang="en" data-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={desc} />
+    <meta name="theme-color" content={meta.accent} />
+    <meta name="author" content={profile.identity.name} />
+    <link rel="icon" href={withBase('/favicon.svg')} type="image/svg+xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:image" content={withBase(`/og/${theme}.svg`)} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={desc} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    {/* non-blocking font load (print-swap) + noscript fallback */}
+    {meta.fontsHref && (
+      <>
+        <link rel="stylesheet" href={meta.fontsHref} media="print" onload="this.media='all'" />
+        <noscript><link rel="stylesheet" href={meta.fontsHref} /></noscript>
+      </>
+    )}
+    {theme === 'hub' && (
+      <>
+        <link rel="stylesheet" href={HUB_PREVIEW_FONTS} media="print" onload="this.media='all'" />
+        <noscript><link rel="stylesheet" href={HUB_PREVIEW_FONTS} /></noscript>
+      </>
+    )}
+
+    <style is:inline>
+      /* Boot overlay is opaque from first paint → never a white flash on switch. */
+      #gm-boot {
+        position: fixed; inset: 0; z-index: 600; display: flex;
+        align-items: center; justify-content: center; overflow: hidden;
+        pointer-events: none; background: #000; text-align: center;
+        animation: gm-bootsafe .6s ease 3.2s forwards;
+      }
+      #gm-boot.done { opacity: 0; visibility: hidden; transition: opacity .55s ease, visibility .55s; }
+      @keyframes gm-bootsafe { to { opacity: 0; visibility: hidden; } }
+      @media (prefers-reduced-motion: reduce) { #gm-boot { display: none !important; } }
+    </style>
+    {/* content is never left invisible without JS */}
+    <noscript><style>#gm-boot { display: none !important; } .rv { opacity: 1 !important; transform: none !important; }</style></noscript>
+  </head>
+  <body data-theme={theme}>
+    <a class="gm-skip" href="#gm-main">Skip to content</a>
+    <GmSwitcher active={theme} />
+
+    <div class="gm-aurora" aria-hidden="true"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+    <div class="gm-cursor" aria-hidden="true"></div>
+    <div class="gm-cursor-ring" aria-hidden="true"></div>
+    <div id="gm-wipe" aria-hidden="true"></div>
+    <div class="gm-sr" aria-live="polite" id="gm-live"></div>
+
+    <div id="gm-main" tabindex="-1">
+      <slot />
+    </div>
+
+    <script>
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const coarse = window.matchMedia('(pointer: coarse)').matches;
+
+      // ---- pause all decorative animation when tab is hidden (battery + Lighthouse) ----
+      document.addEventListener('visibilitychange', () =>
+        document.documentElement.toggleAttribute('data-hidden', document.hidden));
+
+      // ---- WebAudio SFX (default muted; created lazily on first gesture) ----
+      let actx: AudioContext | null = null;
+      (window as any).__gmSfx = (name: string) => {
+        if (localStorage.getItem('gm-muted') !== '0') return; // muted unless explicitly enabled
+        try {
+          actx = actx || new (window.AudioContext || (window as any).webkitAudioContext)();
+          const now = actx.currentTime;
+          const map: Record<string, [number, number, OscillatorType]> = {
+            toggle: [660, 0.07, 'sine'], switch: [340, 0.16, 'triangle'], hover: [900, 0.03, 'sine'],
+          };
+          const [freq, dur, type] = map[name] || [500, 0.06, 'sine'];
+          const o = actx.createOscillator(), g = actx.createGain();
+          o.type = type; o.frequency.value = freq;
+          g.gain.setValueAtTime(0.0001, now);
+          g.gain.exponentialRampToValueAtTime(0.09, now + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+          o.connect(g).connect(actx.destination); o.start(now); o.stop(now + dur + 0.03);
+        } catch {}
+      };
+
+      // ---- themed switch: wipe → navigate (destination boot continues the story) ----
+      (window as any).__gmSwitchTo = (url: string) => {
+        (window as any).__gmSfx('switch');
+        const wipe = document.getElementById('gm-wipe');
+        if (reduce || !wipe) { location.href = url; return; }
+        wipe.classList.add('go');
+        setTimeout(() => { location.href = url; }, 260);
+      };
+      // intercept switcher/pill/picker links so the wipe plays
+      document.querySelectorAll<HTMLAnchorElement>('a[data-theme-target]').forEach((a) => {
+        a.addEventListener('click', (e) => {
+          const href = a.getAttribute('href');
+          const cur = a.getAttribute('aria-current') === 'page';
+          if (!href || cur) return;
+          e.preventDefault();
+          (window as any).__gmSwitchTo(href);
+        });
+      });
+
+      // ---- custom cursor (pointer devices only) ----
+      (function cursor() {
+        if (reduce || coarse) return;
+        const dot = document.querySelector<HTMLElement>('.gm-cursor');
+        const ring = document.querySelector<HTMLElement>('.gm-cursor-ring');
+        if (!dot || !ring) return;
+        let mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, raf = 0;
+        function tick() {
+          rx += (mx - rx) * 0.2; ry += (my - ry) * 0.2;
+          ring.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
+          if (Math.abs(mx - rx) > 0.4 || Math.abs(my - ry) > 0.4) raf = requestAnimationFrame(tick);
+          else raf = 0;
+        }
+        addEventListener('mousemove', (e) => {
+          mx = e.clientX; my = e.clientY;
+          dot.style.transform = `translate(${mx}px, ${my}px) translate(-50%, -50%)`;
+          if (!raf) raf = requestAnimationFrame(tick);
+        }, { passive: true });
+        const hot = 'a, button, .gm-card, .gm-tile, .gm-pill, .gm-pick, [data-hot], .nf-card, .sp-track, .rz-spec, .rz-module, .cod-tag, .cod-op, .dz-poster, .dz-series, .ap-card, .sm-model';
+        addEventListener('mouseover', (e) => { if ((e.target as Element)?.closest?.(hot)) ring.classList.add('hot'); }, { passive: true });
+        addEventListener('mouseout', (e) => { if ((e.target as Element)?.closest?.(hot)) ring.classList.remove('hot'); }, { passive: true });
+      })();
+
+      // ---- reveal-on-scroll + card/bar activation + count-up ----
+      (function reveal() {
+        const els = Array.from(document.querySelectorAll('.rv'));
+        if (reduce) { els.forEach((e) => e.classList.add('in')); runCountups(document); return; }
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach((en) => {
+            if (en.isIntersecting) {
+              en.target.classList.add('in');
+              runCountups(en.target as HTMLElement);
+              io.unobserve(en.target);
+            }
+          });
+        }, { threshold: 0.14, rootMargin: '0px 0px -6% 0px' });
+        els.forEach((e) => io.observe(e));
+      })();
+
+      function runCountups(scope: HTMLElement | Document) {
+        const targets = (scope instanceof Element && scope.matches('[data-countup]'))
+          ? [scope]
+          : Array.from(scope.querySelectorAll<HTMLElement>('[data-countup]'));
+        targets.forEach((el) => {
+          if (el.dataset.done) return; el.dataset.done = '1';
+          const raw = el.dataset.countup || '0';
+          const num = parseFloat(raw.replace(/[^0-9.]/g, ''));
+          if (!isFinite(num) || reduce) { el.textContent = raw; return; }
+          const prefix = el.dataset.prefix || '';
+          const suffix = el.dataset.suffix || '';
+          const dur = 1100; const start = performance.now();
+          const fmt = num >= 1000;
+          function step(now: number) {
+            const p = Math.min(1, (now - start) / dur);
+            const eased = 1 - Math.pow(1 - p, 3);
+            const v = num * eased;
+            el.textContent = prefix + (fmt ? Math.round(v).toLocaleString() : (Number.isInteger(num) ? Math.round(v).toString() : v.toFixed(2))) + suffix;
+            if (p < 1) requestAnimationFrame(step);
+          }
+          requestAnimationFrame(step);
+        });
+      }
+
+      // ---- dismiss the boot overlay after its signature intro ----
+      (function boot() {
+        const el = document.getElementById('gm-boot');
+        if (!el) return;
+        el.setAttribute('aria-hidden', 'true');
+        if (reduce) { el.remove(); return; }
+        const key = 'gm-boot-' + (el.dataset.theme || 'x');
+        const seen = sessionStorage.getItem(key);
+        const dur = seen ? 380 : parseInt(el.dataset.dur || '1600', 10);
+        try { sessionStorage.setItem(key, '1'); } catch {}
+        if (seen) el.classList.add('gm-boot-quick');
+        setTimeout(() => {
+          el.classList.add('done');
+          setTimeout(() => el.remove(), 620);
+        }, dur);
+      })();
+    </script>
+  </body>
+</html>

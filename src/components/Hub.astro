@@ -1,0 +1,166 @@
+---
+import { profile } from '../data/profile';
+import { THEMES, BRAND_THEMES, type ThemeId } from '../lib/themes';
+import { WORDMARKS } from '../lib/wordmarks';
+import { withBase } from '../lib/base';
+import StatGrid from './StatGrid.astro';
+import FlagGrid from './FlagGrid.astro';
+import AboutBlock from './AboutBlock.astro';
+import ContactBlock from './ContactBlock.astro';
+import FooterBlock from './FooterBlock.astro';
+
+const hub = THEMES.hub;
+const worldCount = BRAND_THEMES.length;
+const feel: Record<ThemeId, string> = {
+  hub: '',
+  razer: 'Neon cyberpunk gaming HUD — RGB chroma, overclocked precision.',
+  disney: 'Royal starfield — gold shimmer, fireworks, premium Originals.',
+  cod: 'Tactical ops — deploy bars, radar sweep, dog-tag missions.',
+  netflix: 'Cinematic billboard — profile gate, content rows, Top 10.',
+  spotify: 'Artist page — now-playing bar, equalizer, top tracks.',
+  apple: 'Pure-black keynote — billboard headline, glass tiles, a titanium operator card.',
+  samsung: 'Galaxy-black — cosmic ring, orbiting particles, starfield, spec-sheet cards.',
+};
+
+function countAttrs(value: string) {
+  const num = parseFloat(value.replace(/[^0-9.]/g, ''));
+  const prefix = value.trim().startsWith('$') ? '$' : '';
+  const suffix = /\+$/.test(value.trim()) ? '+' : '';
+  return { num: isFinite(num) ? num : null, prefix, suffix };
+}
+---
+<div id="gm-boot" data-theme="hub" data-dur="1100" style="background:radial-gradient(circle at 50% 45%, #191634, #05050a 70%)">
+  <div class="hub-boot">
+    <div class="hub-boot-diamond"></div>
+    <div class="hub-boot-text">GOD&nbsp;MODE</div>
+  </div>
+</div>
+
+<main class="gm-wrap">
+  <h1 class="gm-visually-hidden">Mohamed Mahmoud — God Mode Portfolio</h1>
+  <p class="gm-kicker rv d1">{hub.copy.kicker}</p>
+  <div class="gm-wordmark rv d2" set:html={WORDMARKS.hub} aria-hidden="true"></div>
+  <p class="gm-banner rv d3">{profile.identity.tagline}</p>
+  <p class="gm-lede rv d4">{hub.copy.lede}</p>
+
+  <div class="gm-herostats">
+    {profile.heroStats.map((s, i) => {
+      const c = countAttrs(s.value);
+      return (
+        <div class={`gm-hs rv d${i + 1}`}>
+          {c.num !== null
+            ? <div class="n" data-countup={String(c.num)} data-prefix={c.prefix} data-suffix={c.suffix}>{s.value}</div>
+            : <div class="n">{s.value}</div>}
+          <div class="l">{s.label}{s.selfReported && <span class="gm-star">*</span>}</div>
+        </div>
+      );
+    })}
+  </div>
+
+  <div class="gm-cta rv d5">
+    <a class="gm-btn" href="#systems"><span aria-hidden="true">▶</span> View Work</a>
+    <a class="gm-btn ghost" href={`mailto:${profile.identity.contact.email}`}><span aria-hidden="true">+</span> Hire Me</a>
+  </div>
+
+  <h2 class="gm-section-title rv" id="identities">Choose your identity</h2>
+  <p class="gm-lede rv" style="margin-top:-6px">{worldCount} completely different worlds. Same real story. Click one — the whole site transforms.</p>
+  <div class="hub-select">
+    {BRAND_THEMES.map((id, i) => {
+      const t = THEMES[id];
+      return (
+        <a class={`hub-card rv d${(i % 5) + 1}`} href={withBase(t.route)} style={`--tc:${t.accent};--tc2:${t.accent2}`}>
+          <div class="hub-card-mark" set:html={WORDMARKS[id]} aria-hidden="true"></div>
+          <div class="hub-card-name">{t.label}</div>
+          <p class="hub-card-feel">{feel[id]}</p>
+          <span class="hub-card-enter">Enter <b>{t.copy.banner}</b> <span aria-hidden="true">→</span></span>
+        </a>
+      );
+    })}
+  </div>
+
+  <h2 class="gm-section-title rv">{hub.copy.teamTitle}</h2>
+  <StatGrid cardLabel={hub.copy.cardLabel} />
+
+  <h2 class="gm-section-title rv" id="systems">{hub.copy.flagTitle}</h2>
+  <FlagGrid flagLabel={hub.copy.flagLabel} />
+
+  <AboutBlock />
+  <ContactBlock />
+  <FooterBlock />
+</main>
+
+<style>
+  /* hub boot */
+  .hub-boot { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .hub-boot-diamond {
+    width: 66px; height: 66px; border: 3px solid transparent;
+    border-image: linear-gradient(135deg, #a48bff, #3ad1ff) 1;
+    transform: rotate(45deg) scale(0);
+    animation: hub-pop .7s cubic-bezier(.2,.9,.2,1) forwards;
+  }
+  .hub-boot-text {
+    font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 700; letter-spacing: .32em;
+    font-size: clamp(20px, 5vw, 34px); color: #f2f2f5; opacity: 0;
+    animation: hub-fade .5s ease .4s forwards;
+  }
+  @keyframes hub-pop { to { transform: rotate(45deg) scale(1); } }
+  @keyframes hub-fade { to { opacity: 1; } }
+
+  /* identity character-select */
+  .hub-select { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-top: 8px; }
+  .hub-card {
+    position: relative; display: flex; flex-direction: column; gap: 12px;
+    padding: 26px 24px 22px; border-radius: 16px; overflow: hidden;
+    background: linear-gradient(165deg, color-mix(in srgb, var(--tc) 16%, #101015), #0c0c12 78%);
+    border: 1px solid color-mix(in srgb, var(--tc) 40%, var(--edge));
+    transition: transform .28s var(--ease), box-shadow .28s var(--ease), border-color .28s;
+    min-height: 190px;
+  }
+  .hub-card::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--tc) 30%, transparent), transparent 60%);
+    transition: opacity .28s;
+  }
+  .hub-card:hover { transform: translateY(-6px); border-color: var(--tc); box-shadow: 0 22px 50px color-mix(in srgb, var(--tc) 30%, transparent); }
+  .hub-card:hover::after { opacity: 1; }
+  .hub-card-mark { height: 46px; display: flex; align-items: center; }
+  .hub-card-mark .wm { width: auto; height: 44px; max-width: 100%; }
+  .hub-card-name { font-family: 'Space Grotesk', system-ui, sans-serif; font-weight: 700; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--tc); }
+  .hub-card-feel { font-size: 13.5px; color: var(--muted); line-height: 1.5; flex: 1; }
+  .hub-card-enter { font-size: 13px; color: var(--text); font-weight: 600; }
+  .hub-card-enter b { color: var(--tc); font-weight: 700; }
+
+  /* a11y: visually-hidden page heading (kept in the a11y tree) */
+  .gm-visually-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* focus parity: mirror the hover lift/glow when a card is keyboard-focused */
+  .hub-card:focus-visible { transform: translateY(-6px); border-color: var(--tc); box-shadow: 0 22px 50px color-mix(in srgb, var(--tc) 30%, transparent); }
+  .hub-card:focus-visible::after { opacity: 1; }
+
+  /* active feedback (tap/press) */
+  .hub-card:active { transform: scale(.98); border-color: var(--tc); }
+
+  /* TOUCH PARITY: on coarse/no-hover pointers the lift+glow can't be reached.
+     Make the accent glow persistently visible and light up the enter label so
+     nothing load-bearing hides behind :hover. */
+  @media (hover: none), (pointer: coarse) {
+    .hub-card::after { opacity: .5; }
+    .hub-card-enter { color: var(--tc); }
+    .hub-card:active { transform: scale(.98); }
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 640px) {
+    .hub-select { grid-template-columns: minmax(min(100%, 260px), 1fr); gap: 16px; }
+    .hub-card { min-height: 0; }
+  }
+  @media (max-width: 480px) {
+    .hub-select { grid-template-columns: 1fr; gap: 14px; }
+    .hub-card { min-height: 0; padding: 20px 18px 18px; }
+    .hub-card-mark .wm { height: 38px; }
+    .hub-boot-diamond { width: 54px; height: 54px; }
+  }
+</style>
