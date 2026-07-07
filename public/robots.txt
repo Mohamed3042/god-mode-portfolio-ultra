@@ -1,4 +1,4 @@
-User-agent: *
+﻿User-agent: *
 Allow: /
 
-Sitemap: https://engineeringprojectswork-droid.github.io/god-mode-portfolio-ultra/sitemap.xml
+Sitemap: https://mohamed3042.github.io/god-mode-portfolio-ultra/sitemap.xml
